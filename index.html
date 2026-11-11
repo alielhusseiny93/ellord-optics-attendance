@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#18100e">
+  <meta name="description" content="نظام تسجيل الحضور والانصراف لموظفات ELLORD OPTICS">
+  <title>الحضور والانصراف | ELLORD OPTICS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+  <style>
+    :root{--orange:#F0481F;--ink:#262424;--muted:#77736f;--line:#e8e4e0;--bg:#f6f5f3}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;padding:20px 14px;background:var(--bg);font-family:'IBM Plex Sans Arabic',Tahoma,Arial,sans-serif;color:var(--ink);display:flex;align-items:center;justify-content:center}
+    .card{max-width:475px;width:100%;border-radius:20px;overflow:hidden;background:white;box-shadow:0 16px 45px #28201e12;border:1px solid #e6e3df}
+    .logo-panel{height:210px;background:#180d09;overflow:hidden;position:relative}
+    .logo-panel img{width:100%;height:100%;display:block;object-fit:cover;object-position:center center}
+    .accent{height:4px;background:var(--orange)}
+    main{padding:26px 26px 30px}
+    .eyebrow{font-size:11px;color:var(--orange);font-weight:700;letter-spacing:1px;margin:0 0 5px}
+    h1{margin:0;font-weight:700;font-size:23px;line-height:1.6;letter-spacing:-.4px}
+    .intro{margin:6px 0 22px;font-size:13px;line-height:1.85;color:var(--muted)}
+    .field{margin-top:17px}
+    label{display:block;margin-bottom:7px;font-weight:600;font-size:13px}
+    select,input{font:inherit;font-size:14px;background:white;color:var(--ink);border:1px solid #dcdad8;border-radius:11px;width:100%;min-height:48px;padding:12px;outline:0}
+    select:disabled{background:#f6f5f3;color:#8e8b87}
+    select:focus,input:focus{border-color:var(--orange);box-shadow:0 0 0 3px #f0481f21}
+    .hint{margin-top:6px;font-size:11px;color:var(--muted);line-height:1.8}
+    .primary,.secondary{font:inherit;display:block;width:100%;min-height:50px;border-radius:11px;font-weight:700;font-size:14px;cursor:pointer}
+    .primary{margin-top:24px;color:white;border:0;background:var(--orange);padding:12px}
+    .primary:disabled{background:#d9a392;cursor:wait}
+    .secondary{margin-top:10px;background:white;color:var(--orange);border:1px solid var(--orange);padding:12px}
+    [hidden]{display:none!important}
+    .error{border:1px solid #f5d0c1;border-radius:11px;background:#fff5f0;color:#9e381f;margin-top:13px;font-size:13px;line-height:1.85;padding:12px}
+    .policy{margin:19px 0 0;border-top:1px solid var(--line);padding-top:16px;color:var(--muted);font-size:11px;line-height:1.95}
+    .dot{display:inline-block;background:var(--orange);height:6px;width:6px;border-radius:50%;margin-left:6px;vertical-align:middle}
+    @media(max-width:420px){body{padding:10px}.logo-panel{height:185px}main{padding:22px 19px 25px}h1{font-size:21px}}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo-panel"><img src="ellord-logo.jpg" alt="ELLORD OPTICS" width="1248" height="1248" decoding="async" fetchpriority="high"></div>
+    <div class="accent"></div>
+    <main>
+      <div class="eyebrow">ELLORD OPTICS | STAFF</div>
+      <h1>تسجيل الحضور والانصراف</h1>
+      <p class="intro">اختاري بياناتك أثناء وجودك بالفرع. يتم التأكد من موقعك الجغرافي عند إرسال التسجيل وحفظ الوقت بتوقيت الإدارة.</p>
+      <form id="attendanceForm" method="post" accept-charset="utf-8" autocomplete="off">
+        <div class="field">
+          <label for="employee">اسم الموظفة</label>
+          <select id="employee" name="employee" required disabled aria-describedby="employeeHint">
+            <option value="">جارٍ تحميل قائمة الموظفات...</option>
+          </select>
+          <div class="hint" id="employeeHint" aria-live="polite">الاختيار من قائمة الموظفات المفعّلات فقط.</div>
+        </div>
+        <div class="field">
+          <label for="branch">الفرع</label>
+          <select id="branch" name="branch" required>
+            <option value="">اختاري الفرع</option>
+            <option value="فرع طه حسين">فرع طه حسين</option>
+            <option value="فرع الحسيني">فرع الحسيني</option>
+            <option value="فرع ابن الخصيب">فرع ابن الخصيب</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="kind">نوع التسجيل</label>
+          <select id="kind" name="kind" required>
+            <option value="">اختاري نوع التسجيل</option>
+            <option value="حضور">حضور</option>
+            <option value="انصراف">انصراف</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="pin">الرمز السري (4 أرقام)</label>
+          <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" required placeholder="••••">
+          <div class="hint">الرمز خاص بكل موظفة، ويُمنع مشاركته مع الآخرين.</div>
+        </div>
+        <input type="hidden" id="latitude" name="latitude">
+        <input type="hidden" id="longitude" name="longitude">
+        <input type="hidden" id="accuracy" name="accuracy">
+        <input type="hidden" id="capturedAt" name="capturedAt">
+        <input type="hidden" id="requestId" name="requestId">
+        <input type="hidden" id="returnUrl" name="returnUrl">
+        <button class="primary" id="submitBtn" type="submit" disabled>جارٍ تجهيز قائمة الموظفات...</button>
+        <p class="error" id="message" role="alert" aria-live="assertive" hidden></p>
+        <button type="button" id="retry" class="secondary" hidden>المحاولة مرة أخرى</button>
+      </form>
+      <p class="policy"><span class="dot"></span>يُستخدم الموقع الجغرافي للتحقق من التواجد بالفرع وقت تسجيل الحضور والانصراف فقط. يلزم السماح بتحديد الموقع؛ ودقة GPS المطلوبة 100 متر أو أفضل، ونطاق الفرع 500 متر.</p>
+    </main>
+  </div>
+  <script>
+  'use strict';
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzZlfCgLUUs_Flcxrqj8H-ubOmqfzz-4A7hOPS7OEz-Ksg3AmZvb6YpPTvZ0vS4-4NBYA/exec';
+  const form = document.getElementById('attendanceForm');
+  const employee = document.getElementById('employee');
+  const hint = document.getElementById('employeeHint');
+  const btn = document.getElementById('submitBtn');
+  const errorBox = document.getElementById('message');
+  const retry = document.getElementById('retry');
+  const normalButtonText = 'تحديد موقعي وتسجيل الحضور/الانصراف';
+  let activeNames = new Set();
+  let rosterReady = false;
+
+  function displayError(message, allowRetry=false){
+    errorBox.textContent=message;
+    errorBox.hidden=false;
+    retry.hidden=!allowRetry;
+    btn.textContent=normalButtonText;
+    btn.disabled=!rosterReady;
+  }
+  window.ELLORD_ROSTER_CALLBACK = function(names){
+    const available = Array.isArray(names) ?
+      [...new Set(names.filter(n=>typeof n==='string' && n.trim()).map(n=>n.trim()))] : [];
+    if(!available.length){
+      rosterFailed('لا توجد موظفات مفعّلات حاليًا. راجعي الإدارة.');return;
+    }
+    activeNames=new Set(available);
+    employee.replaceChildren(new Option('اختاري اسم الموظفة',''));
+    available.forEach(name=>employee.add(new Option(name,name)));
+    rosterReady=true;
+    employee.disabled=false;
+    hint.textContent='اختاري اسمك من القائمة فقط.';
+    btn.disabled=false;
+    btn.textContent=normalButtonText;
+  };
+  function rosterFailed(message){
+    if(rosterReady) return;
+    activeNames.clear();
+    employee.disabled=true;
+    employee.replaceChildren(new Option('قائمة الأسماء غير متاحة',''));
+    hint.textContent=message;
+    btn.disabled=true;
+    btn.textContent='تعذر تحميل قائمة الموظفات';
+  }
+  // Read-only JSONP from Apps Script: no text entry for employee names.
+  const rosterTag=document.createElement('script');
+  const rosterTimeout=setTimeout(()=>rosterFailed('تعذر تحميل قائمة الموظفات. تواصلي مع الإدارة.'),15000);
+  rosterTag.src=SCRIPT_URL+'?roster=1&_='+Date.now();
+  rosterTag.async=true;
+  rosterTag.onerror=()=>{clearTimeout(rosterTimeout);rosterFailed('تعذر الاتصال بسجل الموظفات. تواصلي مع الإدارة.')};
+  rosterTag.onload=()=>{clearTimeout(rosterTimeout);if(!rosterReady)rosterFailed('استجابة غير صحيحة من النظام. تواصلي مع الإدارة.')};
+  document.head.appendChild(rosterTag);
+  const oldCallback=window.ELLORD_ROSTER_CALLBACK;
+  window.ELLORD_ROSTER_CALLBACK=function(names){clearTimeout(rosterTimeout);oldCallback(names)};
+
+  retry.addEventListener('click',()=>{
+    retry.hidden=true;
+    errorBox.hidden=true;
+    form.requestSubmit();
+  });
+
+  form.addEventListener('submit',function(e){
+    e.preventDefault();
+    errorBox.hidden=true;
+    retry.hidden=true;
+    if(!rosterReady || employee.disabled || !activeNames.has(employee.value)){
+      displayError('اسم الموظفة لازم يكون من القائمة المفعّلة فقط.');return;
+    }
+    if(!form.reportValidity())return;
+    if(!navigator.geolocation){
+      displayError('المتصفح لا يدعم تحديد الموقع. افتحي الرابط مباشرة في Safari أو Chrome.',false);return;
+    }
+    btn.disabled=true;
+    btn.textContent='جارٍ تحديد الموقع...';
+    navigator.geolocation.getCurrentPosition(pos=>{
+      if(!Number.isFinite(pos.coords.accuracy) || pos.coords.accuracy>100){
+        displayError('دقة تحديد الموقع ضعيفة (أكثر من 100 متر). فعّلي الموقع الدقيق وحاولي مرة أخرى.',true);return;
+      }
+      document.getElementById('latitude').value=String(pos.coords.latitude);
+      document.getElementById('longitude').value=String(pos.coords.longitude);
+      document.getElementById('accuracy').value=String(pos.coords.accuracy);
+      document.getElementById('capturedAt').value=new Date().toISOString();
+      document.getElementById('requestId').value=String(Date.now())+'_'+Math.random().toString(36).slice(2,14);
+      document.getElementById('returnUrl').value=location.origin+location.pathname;
+      form.action=SCRIPT_URL;
+      btn.textContent='جارٍ حفظ التسجيل...';
+      // Regular form navigation to Apps Script; no CORS fetch request required.
+      HTMLFormElement.prototype.submit.call(form);
+    },err=>{
+      const map={1:'تم رفض إذن الموقع. اسمحي للمتصفح باستخدام الموقع ثم حاولي مرة أخرى.',
+        2:'تعذر تحديد الموقع. تأكدي من تشغيل خدمات الموقع والإنترنت.',
+        3:'انتهت مهلة تحديد الموقع. جربي بالقرب من واجهة الفرع.'};
+      displayError(map[err.code] || 'حدث خطأ أثناء تحديد الموقع.',true);
+    },{enableHighAccuracy:true,timeout:25000,maximumAge:0});
+  });
+  </script>
+</body>
+</html>
