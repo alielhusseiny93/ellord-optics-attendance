@@ -82,11 +82,12 @@
         <input type="hidden" id="capturedAt" name="capturedAt">
         <input type="hidden" id="requestId" name="requestId">
         <input type="hidden" id="returnUrl" name="returnUrl">
+        <input type="hidden" id="clientFailure" name="clientFailure">
         <button class="primary" id="submitBtn" type="submit" disabled>جارٍ تجهيز قائمة الموظفات...</button>
         <p class="error" id="message" role="alert" aria-live="assertive" hidden></p>
         <button type="button" id="retry" class="secondary" hidden>المحاولة مرة أخرى</button>
       </form>
-      <p class="policy"><span class="dot"></span>يُستخدم الموقع الجغرافي للتحقق من التواجد بالفرع وقت تسجيل الحضور والانصراف فقط. يلزم السماح بتحديد الموقع؛ ودقة GPS المطلوبة 100 متر أو أفضل، ونطاق الفرع 500 متر.</p>
+      <p class="policy"><span class="dot"></span>يُستخدم الموقع الجغرافي للتحقق من التواجد بالفرع. يتم توثيق محاولات التسجيل غير المقبولة وسبب الرفض للإدارة، ولا تُحسب حضورًا أو انصرافًا. يلزم السماح بتحديد الموقع؛ ودقة GPS المطلوبة 100 متر أو أفضل، ونطاق الفرع 500 متر.</p>
     </main>
   </div>
   <script>
@@ -144,6 +145,22 @@
   const oldCallback=window.ELLORD_ROSTER_CALLBACK;
   window.ELLORD_ROSTER_CALLBACK=function(names){clearTimeout(rosterTimeout);oldCallback(names)};
 
+  function sendRejectedGpsAttempt(reasonCode) {
+    // The entered PIN is only sent for server validation. It is NEVER logged.
+    // If offline, this request cannot be logged; the employee should contact management.
+    if (!rosterReady || !activeNames.has(employee.value) || !form.reportValidity()) return;
+    document.getElementById('clientFailure').value = reasonCode;
+    for (const field of ['latitude','longitude','accuracy','capturedAt']) {
+      document.getElementById(field).value = '';
+    }
+    document.getElementById('requestId').value = String(Date.now()) + '_' + Math.random().toString(36).slice(2,14);
+    document.getElementById('returnUrl').value = location.origin + location.pathname;
+    form.action = SCRIPT_URL;
+    btn.disabled = true;
+    btn.textContent = 'جارٍ حفظ سبب تعذر التسجيل...';
+    HTMLFormElement.prototype.submit.call(form);
+  }
+
   retry.addEventListener('click',()=>{
     retry.hidden=true;
     errorBox.hidden=true;
@@ -159,13 +176,13 @@
     }
     if(!form.reportValidity())return;
     if(!navigator.geolocation){
-      displayError('المتصفح لا يدعم تحديد الموقع. افتحي الرابط مباشرة في Safari أو Chrome.',false);return;
+      sendRejectedGpsAttempt('GPS_UNSUPPORTED');return;
     }
     btn.disabled=true;
     btn.textContent='جارٍ تحديد الموقع...';
     navigator.geolocation.getCurrentPosition(pos=>{
       if(!Number.isFinite(pos.coords.accuracy) || pos.coords.accuracy>100){
-        displayError('دقة تحديد الموقع ضعيفة (أكثر من 100 متر). فعّلي الموقع الدقيق وحاولي مرة أخرى.',true);return;
+        sendRejectedGpsAttempt('GPS_INACCURATE');return;
       }
       document.getElementById('latitude').value=String(pos.coords.latitude);
       document.getElementById('longitude').value=String(pos.coords.longitude);
@@ -173,6 +190,7 @@
       document.getElementById('capturedAt').value=new Date().toISOString();
       document.getElementById('requestId').value=String(Date.now())+'_'+Math.random().toString(36).slice(2,14);
       document.getElementById('returnUrl').value=location.origin+location.pathname;
+      document.getElementById('clientFailure').value='';
       form.action=SCRIPT_URL;
       btn.textContent='جارٍ حفظ التسجيل...';
       // Regular form navigation to Apps Script; no CORS fetch request required.
@@ -181,7 +199,8 @@
       const map={1:'تم رفض إذن الموقع. اسمحي للمتصفح باستخدام الموقع ثم حاولي مرة أخرى.',
         2:'تعذر تحديد الموقع. تأكدي من تشغيل خدمات الموقع والإنترنت.',
         3:'انتهت مهلة تحديد الموقع. جربي بالقرب من واجهة الفرع.'};
-      displayError(map[err.code] || 'حدث خطأ أثناء تحديد الموقع.',true);
+      const codes={1:'GPS_PERMISSION_DENIED',2:'GPS_UNAVAILABLE',3:'GPS_TIMEOUT'};
+      sendRejectedGpsAttempt(codes[err.code] || 'GPS_UNAVAILABLE');
     },{enableHighAccuracy:true,timeout:25000,maximumAge:0});
   });
   </script>
