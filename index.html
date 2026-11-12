@@ -49,7 +49,7 @@
       <form id="attendanceForm" method="post" accept-charset="utf-8" autocomplete="off">
         <div class="field">
           <label for="employee">اسم الموظفة</label>
-          <select id="employee" name="employee" required aria-describedby="employeeHint">
+          <select id="employee" name="employee" required>
             <option value="">اختاري اسم الموظفة</option>
             <option value="آية منتصر">آية منتصر</option>
             <option value="منة الله نجاح">منة الله نجاح</option>
@@ -58,7 +58,6 @@
             <option value="حبيبة علي">حبيبة علي</option>
             <option value="فاطمة عبدالمجيد">فاطمة عبدالمجيد</option>
           </select>
-          <div class="hint" id="employeeHint" aria-live="polite">اختاري اسمك من القائمة. يتم تحديث الأسماء تلقائيًا عند توفر الإنترنت.</div>
         </div>
         <div class="field">
           <label for="branch">الفرع</label>
@@ -93,7 +92,7 @@
         <p class="error" id="message" role="alert" aria-live="assertive" hidden></p>
         <button type="button" id="retry" class="secondary" hidden>المحاولة مرة أخرى</button>
       </form>
-      <p class="policy"><span class="dot"></span>يُستخدم الموقع الجغرافي للتحقق من التواجد بالفرع. يتم توثيق محاولات التسجيل غير المقبولة وسبب الرفض للإدارة، ولا تُحسب حضورًا أو انصرافًا. يلزم السماح بتحديد الموقع؛ ودقة GPS المطلوبة 100 متر أو أفضل، ونطاق الفرع 500 متر.</p>
+      <p class="policy"><span class="dot"></span>يُستخدم الموقع الجغرافي للتحقق من التواجد بالفرع. يتم توثيق محاولات التسجيل غير المقبولة وسبب الرفض للإدارة، ولا تُحسب حضورًا أو انصرافًا. يلزم السماح بتحديد الموقع؛ ودقة GPS المطلوبة 100 متر أو أفضل، ونطاق كل فرع محدد في إعدادات الإدارة.</p>
     </main>
   </div>
   <script>
@@ -101,7 +100,7 @@
   const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzZlfCgLUUs_Flcxrqj8H-ubOmqfzz-4A7hOPS7OEz-Ksg3AmZvb6YpPTvZ0vS4-4NBYA/exec';
   const form = document.getElementById('attendanceForm');
   const employee = document.getElementById('employee');
-  const hint = document.getElementById('employeeHint');
+  const branchSelect = document.getElementById('branch');
   const btn = document.getElementById('submitBtn');
   const errorBox = document.getElementById('message');
   const retry = document.getElementById('retry');
@@ -113,10 +112,13 @@
     'بسمة علي', 'حبيبة علي', 'فاطمة عبدالمجيد'
   ];
   const ROSTER_CACHE_KEY = 'ELLORD_ACTIVE_STAFF_ROSTER_V1';
+  const BUILT_IN_BRANCHES = ['فرع طه حسين', 'فرع الحسيني', 'فرع ابن الخصيب'];
+  const BRANCH_CACHE_KEY = 'ELLORD_ACTIVE_BRANCH_ROSTER_V1';
+  let activeBranches = new Set(BUILT_IN_BRANCHES);
+  let branchReady = true;
   let activeNames = new Set(BUILT_IN_NAMES);
   let rosterReady = true;
   let submitting = false;
-  let rosterResponseReceived = false;
 
   function displayError(message, allowRetry=false){
     submitting=false;
@@ -124,7 +126,7 @@
     errorBox.hidden=false;
     retry.hidden=!allowRetry;
     btn.textContent=normalButtonText;
-    btn.disabled=!rosterReady;
+    btn.disabled=!(rosterReady && branchReady);
   }
 
   function normalizeRoster(names){
@@ -146,7 +148,6 @@
       rosterReady=false;
       employee.disabled=true;
       employee.replaceChildren(new Option('لا توجد موظفات مفعّلات حاليًا',''));
-      hint.textContent='لا توجد موظفات مفعّلات حاليًا. تواصلي مع الإدارة.';
       btn.disabled=true;
       btn.textContent='لا توجد موظفات مفعّلات';
       return true;
@@ -165,13 +166,8 @@
     rosterReady=true;
     employee.disabled=false;
     if(!submitting){
-      btn.disabled=false;
+      btn.disabled=!(rosterReady && branchReady);
       btn.textContent=normalButtonText;
-    }
-    if(fromServer){
-      hint.textContent='قائمة الموظفات محدّثة تلقائيًا. اختاري اسمك من القائمة.';
-    } else {
-      hint.textContent='الأسماء جاهزة للاختيار. سيتم تحديثها تلقائيًا عند توفر الإنترنت.';
     }
     return true;
   }
@@ -186,41 +182,74 @@
   // Background-only JSONP refresh: never keep the dropdown waiting on network.
   // No PIN, GPS, or employee selections are sent with this read-only request.
   window.ELLORD_ROSTER_CALLBACK=function(names){
-    rosterResponseReceived=true;
-    clearTimeout(rosterTimeout);
     if(applyRoster(names,true)){
       try {
         localStorage.setItem(ROSTER_CACHE_KEY,JSON.stringify({names,updatedAt:Date.now()}));
       } catch(_) { /* Cache is best-effort. */ }
-    } else {
-      hint.textContent='الأسماء جاهزة، لكن تعذّر التأكد من آخر تحديث لها.';
     }
   };
 
   const rosterTag=document.createElement('script');
-  const rosterTimeout=setTimeout(()=>{
-    if(!rosterResponseReceived){
-      hint.textContent='الأسماء جاهزة. تعذّر تحديث القائمة الآن؛ يلزم الإنترنت لإتمام التسجيل.';
-    }
-  },8000);
   rosterTag.src=SCRIPT_URL+'?roster=1&_='+Date.now();
   rosterTag.async=true;
-  rosterTag.onerror=()=>{
-    clearTimeout(rosterTimeout);
-    hint.textContent='الأسماء جاهزة. تعذّر تحديث القائمة الآن؛ يلزم الإنترنت لإتمام التسجيل.';
-  };
-  rosterTag.onload=()=>{
-    if(!rosterResponseReceived){
-      clearTimeout(rosterTimeout);
-      hint.textContent='الأسماء جاهزة، لكن تعذّر التأكد من آخر تحديث لها.';
+  document.head.appendChild(rosterTag);
+
+
+  // Branches are immediately visible from HTML or last saved server list.
+  // A new/disabled branch is synced silently from the Google Sheet via Apps Script.
+  // The server validates the CURRENT branch configuration for every POST.
+  function applyBranches(names, fromServer){
+    const available=normalizeRoster(names);
+    if(available===null) return false;
+    if(fromServer && available.length===0){
+      activeBranches.clear();
+      branchReady=false;
+      branchSelect.disabled=true;
+      branchSelect.replaceChildren(new Option('لا توجد فروع متاحة حاليًا',''));
+      btn.disabled=true;
+      return true;
+    }
+    if(!available.length) return false;
+    const selected=branchSelect.value;
+    activeBranches=new Set(available);
+    branchSelect.replaceChildren(new Option('اختاري الفرع',''));
+    available.forEach(name=>branchSelect.add(new Option(name,name)));
+    if(selected && activeBranches.has(selected)){
+      branchSelect.value=selected;
+    } else if(selected && fromServer){
+      displayError('الفرع المختار لم يعد متاحًا. اختاري فرعًا آخر.');
+    }
+    branchReady=true;
+    branchSelect.disabled=false;
+    if(!submitting){
+      btn.disabled=!(rosterReady && branchReady);
+      btn.textContent=normalButtonText;
+    }
+    return true;
+  }
+
+  try {
+    const saved=JSON.parse(localStorage.getItem(BRANCH_CACHE_KEY) || 'null');
+    if(saved && Array.isArray(saved.names)) applyBranches(saved.names,false);
+  } catch(_) { /* Not all devices allow local storage. */ }
+
+  window.ELLORD_BRANCHES_CALLBACK=function(names){
+    if(applyBranches(names,true)){
+      try {
+        localStorage.setItem(BRANCH_CACHE_KEY,JSON.stringify({names,updatedAt:Date.now()}));
+      } catch(_) { /* Best-effort cache. */ }
     }
   };
-  document.head.appendChild(rosterTag);
+
+  const branchesTag=document.createElement('script');
+  branchesTag.src=SCRIPT_URL+'?branches=1&_='+Date.now();
+  branchesTag.async=true;
+  document.head.appendChild(branchesTag);
 
   function sendRejectedGpsAttempt(reasonCode) {
     // The entered PIN is only sent for server validation. It is NEVER logged.
     // If offline, this request cannot be logged; the employee should contact management.
-    if (!rosterReady || !activeNames.has(employee.value) || !form.reportValidity()) return;
+    if (!rosterReady || !activeNames.has(employee.value) || !branchReady || !activeBranches.has(branchSelect.value) || !form.reportValidity()) return;
     document.getElementById('clientFailure').value = reasonCode;
     for (const field of ['latitude','longitude','accuracy','capturedAt']) {
       document.getElementById(field).value = '';
@@ -246,6 +275,9 @@
     retry.hidden=true;
     if(!rosterReady || employee.disabled || !activeNames.has(employee.value)){
       displayError('اسم الموظفة لازم يكون من القائمة المفعّلة فقط.');return;
+    }
+    if(!branchReady || branchSelect.disabled || !activeBranches.has(branchSelect.value)){
+      displayError('اختاري فرعًا متاحًا من القائمة.');return;
     }
     if(!form.reportValidity())return;
     if(!navigator.onLine){
