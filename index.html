@@ -67,6 +67,7 @@
             <option value="فرع الحسيني">فرع الحسيني</option>
             <option value="فرع ابن الخصيب">فرع ابن الخصيب</option>
           </select>
+          <div class="hint" id="branchRadiusHint" aria-live="polite" hidden></div>
         </div>
         <div class="field">
           <label for="kind">نوع التسجيل</label>
@@ -92,7 +93,7 @@
         <p class="error" id="message" role="alert" aria-live="assertive" hidden></p>
         <button type="button" id="retry" class="secondary" hidden>المحاولة مرة أخرى</button>
       </form>
-      <p class="policy"><span class="dot"></span>يُستخدم الموقع الجغرافي للتحقق من التواجد بالفرع. يتم توثيق محاولات التسجيل غير المقبولة وسبب الرفض للإدارة، ولا تُحسب حضورًا أو انصرافًا. يلزم السماح بتحديد الموقع؛ ودقة GPS المطلوبة 100 متر أو أفضل، ونطاق كل فرع محدد في إعدادات الإدارة.</p>
+      <p class="policy"><span class="dot"></span>يُستخدم الموقع الجغرافي للتحقق من التواجد بالفرع. يتم توثيق محاولات التسجيل غير المقبولة وسبب الرفض للإدارة، ولا تُحسب حضورًا أو انصرافًا. يلزم السماح بتحديد الموقع؛ ودقة GPS المطلوبة 100 متر أو أفضل، ويظهر نطاق السماح الخاص بالفرع بعد اختياره.</p>
     </main>
   </div>
   <script>
@@ -113,7 +114,12 @@
   ];
   const ROSTER_CACHE_KEY = 'ELLORD_ACTIVE_STAFF_ROSTER_V1';
   const BUILT_IN_BRANCHES = ['فرع طه حسين', 'فرع الحسيني', 'فرع ابن الخصيب'];
+  // Initial hints must match the current sheet; server remains authoritative.
+  const BUILT_IN_BRANCH_RADII = {'فرع طه حسين':100,'فرع الحسيني':300,'فرع ابن الخصيب':100};
   const BRANCH_CACHE_KEY = 'ELLORD_ACTIVE_BRANCH_ROSTER_V1';
+  const BRANCH_DETAILS_CACHE_KEY = 'ELLORD_ACTIVE_BRANCH_DETAILS_V1';
+  const branchRadiusHint = document.getElementById('branchRadiusHint');
+  let branchRadii = new Map(Object.entries(BUILT_IN_BRANCH_RADII));
   let activeBranches = new Set(BUILT_IN_BRANCHES);
   let branchReady = true;
   let activeNames = new Set(BUILT_IN_NAMES);
@@ -198,6 +204,15 @@
   // Branches are immediately visible from HTML or last saved server list.
   // A new/disabled branch is synced silently from the Google Sheet via Apps Script.
   // The server validates the CURRENT branch configuration for every POST.
+  function updateBranchRadiusHint(){
+    const radius=branchRadii.get(branchSelect.value);
+    const show=activeBranches.has(branchSelect.value) &&
+      Number.isFinite(radius) && radius>=30 && radius<=1000;
+    branchRadiusHint.hidden=!show;
+    branchRadiusHint.textContent=show ?
+      'نطاق السماح لهذا الفرع: '+radius.toLocaleString('ar-EG')+' متر من موقع الفرع.' : '';
+  }
+  branchSelect.addEventListener('change',updateBranchRadiusHint);
   function applyBranches(names, fromServer){
     const available=normalizeRoster(names);
     if(available===null) return false;
@@ -206,6 +221,7 @@
       branchReady=false;
       branchSelect.disabled=true;
       branchSelect.replaceChildren(new Option('لا توجد فروع متاحة حاليًا',''));
+      updateBranchRadiusHint();
       btn.disabled=true;
       return true;
     }
@@ -221,6 +237,7 @@
     }
     branchReady=true;
     branchSelect.disabled=false;
+    updateBranchRadiusHint();
     if(!submitting){
       btn.disabled=!(rosterReady && branchReady);
       btn.textContent=normalButtonText;
@@ -233,16 +250,46 @@
     if(saved && Array.isArray(saved.names)) applyBranches(saved.names,false);
   } catch(_) { /* Not all devices allow local storage. */ }
 
-  window.ELLORD_BRANCHES_CALLBACK=function(names){
-    if(applyBranches(names,true)){
+  function applyBranchDetails(details,fromServer){
+    if(!Array.isArray(details)) return false;
+    const valid=[];
+    const seen=new Set();
+    for(const item of details){
+      if(!item || typeof item.name!=='string') continue;
+      const name=item.name.trim();
+      const radius=Number(item.radius);
+      if(!name || name.length>80 || seen.has(name) ||
+         !Number.isFinite(radius) || radius<30 || radius>1000) continue;
+      valid.push({name,radius});
+      seen.add(name);
+    }
+    if(details.length && !valid.length) return false;
+    const names=valid.map(x=>x.name);
+    // A confirmed empty server list disables the branch dropdown.
+    if(!applyBranches(names,fromServer)) return false;
+    branchRadii=new Map(valid.map(x=>[x.name,x.radius]));
+    updateBranchRadiusHint();
+    return true;
+  }
+
+  try {
+    const saved=JSON.parse(localStorage.getItem(BRANCH_DETAILS_CACHE_KEY)||'null');
+    if(saved && Array.isArray(saved.branches)) applyBranchDetails(saved.branches,false);
+  } catch(_) { /* Continue with immediately available default branches. */ }
+
+  window.ELLORD_BRANCH_DETAILS_CALLBACK=function(details){
+    if(applyBranchDetails(details,true)){
       try {
-        localStorage.setItem(BRANCH_CACHE_KEY,JSON.stringify({names,updatedAt:Date.now()}));
-      } catch(_) { /* Best-effort cache. */ }
+        localStorage.setItem(BRANCH_DETAILS_CACHE_KEY,
+          JSON.stringify({branches:details,updatedAt:Date.now()}));
+        localStorage.setItem(BRANCH_CACHE_KEY,
+          JSON.stringify({names:details.map(x=>x.name),updatedAt:Date.now()}));
+      } catch(_) { /* Cache is best-effort. */ }
     }
   };
 
   const branchesTag=document.createElement('script');
-  branchesTag.src=SCRIPT_URL+'?branches=1&_='+Date.now();
+  branchesTag.src=SCRIPT_URL+'?branchDetails=1&_='+Date.now();
   branchesTag.async=true;
   document.head.appendChild(branchesTag);
 
