@@ -49,10 +49,16 @@
       <form id="attendanceForm" method="post" accept-charset="utf-8" autocomplete="off">
         <div class="field">
           <label for="employee">اسم الموظفة</label>
-          <select id="employee" name="employee" required disabled aria-describedby="employeeHint">
-            <option value="">جارٍ تحميل قائمة الموظفات...</option>
+          <select id="employee" name="employee" required aria-describedby="employeeHint">
+            <option value="">اختاري اسم الموظفة</option>
+            <option value="آية منتصر">آية منتصر</option>
+            <option value="منة الله نجاح">منة الله نجاح</option>
+            <option value="سلوى جلال">سلوى جلال</option>
+            <option value="بسمة علي">بسمة علي</option>
+            <option value="حبيبة علي">حبيبة علي</option>
+            <option value="فاطمة عبدالمجيد">فاطمة عبدالمجيد</option>
           </select>
-          <div class="hint" id="employeeHint" aria-live="polite">الاختيار من قائمة الموظفات المفعّلات فقط.</div>
+          <div class="hint" id="employeeHint" aria-live="polite">اختاري اسمك من القائمة. يتم تحديث الأسماء تلقائيًا عند توفر الإنترنت.</div>
         </div>
         <div class="field">
           <label for="branch">الفرع</label>
@@ -83,7 +89,7 @@
         <input type="hidden" id="requestId" name="requestId">
         <input type="hidden" id="returnUrl" name="returnUrl">
         <input type="hidden" id="clientFailure" name="clientFailure">
-        <button class="primary" id="submitBtn" type="submit" disabled>جارٍ تجهيز قائمة الموظفات...</button>
+        <button class="primary" id="submitBtn" type="submit">تحديد موقعي وتسجيل الحضور/الانصراف</button>
         <p class="error" id="message" role="alert" aria-live="assertive" hidden></p>
         <button type="button" id="retry" class="secondary" hidden>المحاولة مرة أخرى</button>
       </form>
@@ -100,50 +106,116 @@
   const errorBox = document.getElementById('message');
   const retry = document.getElementById('retry');
   const normalButtonText = 'تحديد موقعي وتسجيل الحضور/الانصراف';
-  let activeNames = new Set();
-  let rosterReady = false;
+  // Immediate built-in fallback: names are ready even before the API responds.
+  // Back end always checks the current active roster and PIN at submission time.
+  const BUILT_IN_NAMES = [
+    'آية منتصر', 'منة الله نجاح', 'سلوى جلال',
+    'بسمة علي', 'حبيبة علي', 'فاطمة عبدالمجيد'
+  ];
+  const ROSTER_CACHE_KEY = 'ELLORD_ACTIVE_STAFF_ROSTER_V1';
+  let activeNames = new Set(BUILT_IN_NAMES);
+  let rosterReady = true;
+  let submitting = false;
+  let rosterResponseReceived = false;
 
   function displayError(message, allowRetry=false){
+    submitting=false;
     errorBox.textContent=message;
     errorBox.hidden=false;
     retry.hidden=!allowRetry;
     btn.textContent=normalButtonText;
     btn.disabled=!rosterReady;
   }
-  window.ELLORD_ROSTER_CALLBACK = function(names){
-    const available = Array.isArray(names) ?
-      [...new Set(names.filter(n=>typeof n==='string' && n.trim()).map(n=>n.trim()))] : [];
-    if(!available.length){
-      rosterFailed('لا توجد موظفات مفعّلات حاليًا. راجعي الإدارة.');return;
+
+  function normalizeRoster(names){
+    if(!Array.isArray(names)) return null;
+    const clean=names
+      .filter(n=>typeof n==='string')
+      .map(n=>n.trim())
+      .filter(n=>n && n.length<=80);
+    return [...new Set(clean)].sort((a,b)=>a.localeCompare(b,'ar'));
+  }
+
+  function applyRoster(names, fromServer){
+    const available=normalizeRoster(names);
+    if(available===null) return false;
+
+    // An explicit empty server roster means no employees are currently active.
+    if(fromServer && available.length===0){
+      activeNames.clear();
+      rosterReady=false;
+      employee.disabled=true;
+      employee.replaceChildren(new Option('لا توجد موظفات مفعّلات حاليًا',''));
+      hint.textContent='لا توجد موظفات مفعّلات حاليًا. تواصلي مع الإدارة.';
+      btn.disabled=true;
+      btn.textContent='لا توجد موظفات مفعّلات';
+      return true;
     }
+    if(!available.length) return false;
+
+    const previouslySelected=employee.value;
     activeNames=new Set(available);
     employee.replaceChildren(new Option('اختاري اسم الموظفة',''));
     available.forEach(name=>employee.add(new Option(name,name)));
+    if(previouslySelected && activeNames.has(previouslySelected)){
+      employee.value=previouslySelected;
+    } else if(previouslySelected && fromServer){
+      displayError('الاسم المختار لم يعد ضمن الموظفات المفعّلات. اختاري اسمًا من القائمة.');
+    }
     rosterReady=true;
     employee.disabled=false;
-    hint.textContent='اختاري اسمك من القائمة فقط.';
-    btn.disabled=false;
-    btn.textContent=normalButtonText;
-  };
-  function rosterFailed(message){
-    if(rosterReady) return;
-    activeNames.clear();
-    employee.disabled=true;
-    employee.replaceChildren(new Option('قائمة الأسماء غير متاحة',''));
-    hint.textContent=message;
-    btn.disabled=true;
-    btn.textContent='تعذر تحميل قائمة الموظفات';
+    if(!submitting){
+      btn.disabled=false;
+      btn.textContent=normalButtonText;
+    }
+    if(fromServer){
+      hint.textContent='قائمة الموظفات محدّثة تلقائيًا. اختاري اسمك من القائمة.';
+    } else {
+      hint.textContent='الأسماء جاهزة للاختيار. سيتم تحديثها تلقائيًا عند توفر الإنترنت.';
+    }
+    return true;
   }
-  // Read-only JSONP from Apps Script: no text entry for employee names.
+
+  // Show the last server-confirmed roster immediately on returning devices.
+  // If storage is restricted, the built-in names are still visible.
+  try {
+    const saved=JSON.parse(localStorage.getItem(ROSTER_CACHE_KEY) || 'null');
+    if(saved && Array.isArray(saved.names)) applyRoster(saved.names,false);
+  } catch(_) { /* Browser storage can be disabled without blocking the form. */ }
+
+  // Background-only JSONP refresh: never keep the dropdown waiting on network.
+  // No PIN, GPS, or employee selections are sent with this read-only request.
+  window.ELLORD_ROSTER_CALLBACK=function(names){
+    rosterResponseReceived=true;
+    clearTimeout(rosterTimeout);
+    if(applyRoster(names,true)){
+      try {
+        localStorage.setItem(ROSTER_CACHE_KEY,JSON.stringify({names,updatedAt:Date.now()}));
+      } catch(_) { /* Cache is best-effort. */ }
+    } else {
+      hint.textContent='الأسماء جاهزة، لكن تعذّر التأكد من آخر تحديث لها.';
+    }
+  };
+
   const rosterTag=document.createElement('script');
-  const rosterTimeout=setTimeout(()=>rosterFailed('تعذر تحميل قائمة الموظفات. تواصلي مع الإدارة.'),15000);
+  const rosterTimeout=setTimeout(()=>{
+    if(!rosterResponseReceived){
+      hint.textContent='الأسماء جاهزة. تعذّر تحديث القائمة الآن؛ يلزم الإنترنت لإتمام التسجيل.';
+    }
+  },8000);
   rosterTag.src=SCRIPT_URL+'?roster=1&_='+Date.now();
   rosterTag.async=true;
-  rosterTag.onerror=()=>{clearTimeout(rosterTimeout);rosterFailed('تعذر الاتصال بسجل الموظفات. تواصلي مع الإدارة.')};
-  rosterTag.onload=()=>{clearTimeout(rosterTimeout);if(!rosterReady)rosterFailed('استجابة غير صحيحة من النظام. تواصلي مع الإدارة.')};
+  rosterTag.onerror=()=>{
+    clearTimeout(rosterTimeout);
+    hint.textContent='الأسماء جاهزة. تعذّر تحديث القائمة الآن؛ يلزم الإنترنت لإتمام التسجيل.';
+  };
+  rosterTag.onload=()=>{
+    if(!rosterResponseReceived){
+      clearTimeout(rosterTimeout);
+      hint.textContent='الأسماء جاهزة، لكن تعذّر التأكد من آخر تحديث لها.';
+    }
+  };
   document.head.appendChild(rosterTag);
-  const oldCallback=window.ELLORD_ROSTER_CALLBACK;
-  window.ELLORD_ROSTER_CALLBACK=function(names){clearTimeout(rosterTimeout);oldCallback(names)};
 
   function sendRejectedGpsAttempt(reasonCode) {
     // The entered PIN is only sent for server validation. It is NEVER logged.
@@ -156,6 +228,7 @@
     document.getElementById('requestId').value = String(Date.now()) + '_' + Math.random().toString(36).slice(2,14);
     document.getElementById('returnUrl').value = location.origin + location.pathname;
     form.action = SCRIPT_URL;
+    submitting = true;
     btn.disabled = true;
     btn.textContent = 'جارٍ حفظ سبب تعذر التسجيل...';
     HTMLFormElement.prototype.submit.call(form);
@@ -175,9 +248,14 @@
       displayError('اسم الموظفة لازم يكون من القائمة المفعّلة فقط.');return;
     }
     if(!form.reportValidity())return;
+    if(!navigator.onLine){
+      displayError('الإنترنت غير متاح حاليًا. الأسماء جاهزة، لكن تسجيل الحضور يحتاج اتصالًا بالإنترنت.', true);
+      return;
+    }
     if(!navigator.geolocation){
       sendRejectedGpsAttempt('GPS_UNSUPPORTED');return;
     }
+    submitting=true;
     btn.disabled=true;
     btn.textContent='جارٍ تحديد الموقع...';
     navigator.geolocation.getCurrentPosition(pos=>{
